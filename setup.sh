@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Script de Setup DevOps - Foco: Aplot Cloud
-# Sistema: Ubuntu Server 24.04 LTS (Minimal Proof)
-# Versão: 16.0 (Robustez Total contra falhas de dependência)
+# Sistema: Ubuntu Server 24.04 LTS
+# Versão: 17.0 (Fastfetch PPA Fix & Error Handling)
 
 set -e
 
@@ -38,25 +38,14 @@ echo "[1/13] Sincronizando relógio (SP)..."
 sudo timedatectl set-timezone America/Sao_Paulo
 sudo timedatectl set-ntp true
 
-# 2. PREPARAÇÃO DO AMBIENTE (A VACINA CONTRA ERROS)
+# 2. PREPARAÇÃO DO AMBIENTE
 echo "[2/13] Preparando ambiente Minimal..."
-echo "   - Atualizando lista de pacotes..."
 sudo apt update -y
-
-echo "   - Instalando gerenciador de repositórios..."
-# Isso evita falha ao tentar adicionar repositórios
 sudo apt install software-properties-common -y
-
-echo "   - Ativando repositório Universe (Para Fastfetch/Ncdu)..."
-# Isso evita o erro "Unable to locate package"
 sudo add-apt-repository universe -y
 sudo add-apt-repository multiverse -y
-
-echo "   - Instalando ferramentas essenciais..."
-# Garante que comandos básicos existam antes de serem usados
 sudo apt install curl wget unzip git tar -y
-
-echo "✅ Ambiente base preparado com sucesso."
+echo "✅ Ambiente base preparado."
 
 # 3. SEGURANÇA SSH
 echo "[3/13] Instalando Fail2Ban..."
@@ -81,13 +70,10 @@ fi
 # 4. FIREWALL (UFW)
 read -p "[4/13] Ativar Firewall (Recomendado)? (s/n): " confirm_ufw
 if [[ $confirm_ufw == [sS] ]]; then
-    echo "Verificando instalação do UFW..."
-    # Verifica se o UFW existe, se não, instala
     if ! command -v ufw &> /dev/null; then
-        echo "   - UFW não encontrado. Instalando..."
+        echo "Installing UFW..."
         sudo apt install ufw -y
     fi
-    
     sudo ufw allow ssh
     sudo ufw allow http
     sudo ufw allow https
@@ -128,17 +114,27 @@ sudo sysctl --system > /dev/null
 echo "[7/13] Instalando Monitoramento..."
 sudo apt install btop -y
 
-# 8. FERRAMENTAS EXTRAS
+# 8. FERRAMENTAS EXTRAS (CORREÇÃO PPA)
 echo "[8/13] Kit DevOps..."
 read -p "Instalar Kit Completo (Ncdu, Fastfetch, Rede)? (s/n): " confirm_tools
 if [[ $confirm_tools == [sS] ]]; then
-    # Como já ativamos o Universe no passo 2, isso aqui VAI funcionar
-    sudo apt install net-tools iputils-ping dnsutils ncdu fastfetch -y
+    # 1. Instala ferramentas padrão primeiro (sem fastfetch)
+    sudo apt install net-tools iputils-ping dnsutils ncdu -y
     
-    if ! grep -q "fastfetch" ~/.bashrc; then
-        echo -e "\n# Visual\nfastfetch" >> ~/.bashrc
+    # 2. Tenta instalar Fastfetch via PPA Oficial
+    echo "Tentando instalar Fastfetch via PPA..."
+    sudo add-apt-repository ppa:zhangsongcui3336/fastfetch -y
+    sudo apt update
+    
+    if sudo apt install fastfetch -y; then
+        echo "✅ Fastfetch instalado com sucesso via PPA."
+        if ! grep -q "fastfetch" ~/.bashrc; then
+            echo -e "\n# Visual\nfastfetch" >> ~/.bashrc
+        fi
+    else
+        echo "⚠️  Não foi possível instalar Fastfetch. Pulando..."
+        echo "   (O restante das ferramentas foi instalado corretamente)."
     fi
-    echo "✅ Ferramentas instaladas."
 fi
 
 # 9. MANUTENÇÃO AUTOMÁTICA
