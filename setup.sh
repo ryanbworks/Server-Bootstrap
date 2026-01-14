@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Script de Setup DevOps - Foco: Aplot Cloud
-# Sistema: Ubuntu Server 24.04 LTS (Compatível com Minimal)
-# Versão: 14.0 (Minimal Fix & Laptop Mode)
+# Sistema: Ubuntu Server 24.04 LTS (Minimal Proof)
+# Versão: 16.0 (Robustez Total contra falhas de dependência)
 
 set -e
 
@@ -11,9 +11,9 @@ echo "INICIANDO SETUP DEVOPS: APLOT CLOUD"
 echo "------------------------------------------------"
 
 # 0. CONFIGURAÇÃO DE CHAVE SSH
-echo "[0/13] Configuração de Acesso (Login Seguro)..."
+echo "[0/13] Configuração de Acesso..."
 echo "----------------------------------------------------------------"
-echo "DICA: Gere a chave NO SEU COMPUTADOR com:"
+echo "DICA: Gere a chave NO SEU COMPUTADOR:"
 echo "ssh-keygen -t ed25519 -C 'seu-email'"
 echo "Copie o conteúdo de: ~/.ssh/id_ed25519.pub"
 echo "----------------------------------------------------------------"
@@ -38,9 +38,25 @@ echo "[1/13] Sincronizando relógio (SP)..."
 sudo timedatectl set-timezone America/Sao_Paulo
 sudo timedatectl set-ntp true
 
-# 2. ATUALIZAÇÃO GERAL
-echo "[2/13] Atualizando sistema..."
-sudo apt update && sudo apt upgrade -y
+# 2. PREPARAÇÃO DO AMBIENTE (A VACINA CONTRA ERROS)
+echo "[2/13] Preparando ambiente Minimal..."
+echo "   - Atualizando lista de pacotes..."
+sudo apt update -y
+
+echo "   - Instalando gerenciador de repositórios..."
+# Isso evita falha ao tentar adicionar repositórios
+sudo apt install software-properties-common -y
+
+echo "   - Ativando repositório Universe (Para Fastfetch/Ncdu)..."
+# Isso evita o erro "Unable to locate package"
+sudo add-apt-repository universe -y
+sudo add-apt-repository multiverse -y
+
+echo "   - Instalando ferramentas essenciais..."
+# Garante que comandos básicos existam antes de serem usados
+sudo apt install curl wget unzip git tar -y
+
+echo "✅ Ambiente base preparado com sucesso."
 
 # 3. SEGURANÇA SSH
 echo "[3/13] Instalando Fail2Ban..."
@@ -62,12 +78,15 @@ if [[ $lock_ssh == [sS] ]]; then
     fi
 fi
 
-# 4. FIREWALL (CORREÇÃO MINIMAL)
+# 4. FIREWALL (UFW)
 read -p "[4/13] Ativar Firewall (Recomendado)? (s/n): " confirm_ufw
 if [[ $confirm_ufw == [sS] ]]; then
-    echo "Instalando e configurando UFW..."
-    # AQUI ESTÁ A CORREÇÃO: Instala o ufw antes de usar
-    sudo apt install ufw -y
+    echo "Verificando instalação do UFW..."
+    # Verifica se o UFW existe, se não, instala
+    if ! command -v ufw &> /dev/null; then
+        echo "   - UFW não encontrado. Instalando..."
+        sudo apt install ufw -y
+    fi
     
     sudo ufw allow ssh
     sudo ufw allow http
@@ -106,17 +125,20 @@ EOF
 sudo sysctl --system > /dev/null
 
 # 7. MONITORAMENTO
+echo "[7/13] Instalando Monitoramento..."
 sudo apt install btop -y
 
 # 8. FERRAMENTAS EXTRAS
 echo "[8/13] Kit DevOps..."
-read -p "Instalar Git, Ncdu, Fastfetch e Rede? (s/n): " confirm_tools
+read -p "Instalar Kit Completo (Ncdu, Fastfetch, Rede)? (s/n): " confirm_tools
 if [[ $confirm_tools == [sS] ]]; then
-    # Instala o pacote completo
-    sudo apt install git curl wget net-tools iputils-ping dnsutils ncdu fastfetch -y
+    # Como já ativamos o Universe no passo 2, isso aqui VAI funcionar
+    sudo apt install net-tools iputils-ping dnsutils ncdu fastfetch -y
+    
     if ! grep -q "fastfetch" ~/.bashrc; then
         echo -e "\n# Visual\nfastfetch" >> ~/.bashrc
     fi
+    echo "✅ Ferramentas instaladas."
 fi
 
 # 9. MANUTENÇÃO AUTOMÁTICA
