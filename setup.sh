@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Script de Setup DevOps - Foco: Aplot Cloud
-# Sistema: Ubuntu Server 24.04 LTS
-# Versão: 13.0 (Laptop Mode Supported)
+# Sistema: Ubuntu Server 24.04 LTS (Compatível com Minimal)
+# Versão: 14.0 (Minimal Fix & Laptop Mode)
 
 set -e
 
@@ -13,9 +13,9 @@ echo "------------------------------------------------"
 # 0. CONFIGURAÇÃO DE CHAVE SSH
 echo "[0/13] Configuração de Acesso (Login Seguro)..."
 echo "----------------------------------------------------------------"
-echo "DICA: A chave deve ser gerada no SEU COMPUTADOR (não aqui)."
-echo "No seu PC, rode: ssh-keygen -t ed25519 -C 'seu-email'"
-echo "Depois copie o conteúdo de: ~/.ssh/id_ed25519.pub"
+echo "DICA: Gere a chave NO SEU COMPUTADOR com:"
+echo "ssh-keygen -t ed25519 -C 'seu-email'"
+echo "Copie o conteúdo de: ~/.ssh/id_ed25519.pub"
 echo "----------------------------------------------------------------"
 
 read -p "Deseja colar sua Chave Pública agora? (s/n): " confirm_ssh
@@ -42,7 +42,7 @@ sudo timedatectl set-ntp true
 echo "[2/13] Atualizando sistema..."
 sudo apt update && sudo apt upgrade -y
 
-# 3. SEGURANÇA (SSH BLINDADO)
+# 3. SEGURANÇA SSH
 echo "[3/13] Instalando Fail2Ban..."
 sudo apt install fail2ban -y
 
@@ -62,9 +62,13 @@ if [[ $lock_ssh == [sS] ]]; then
     fi
 fi
 
-# 4. FIREWALL
+# 4. FIREWALL (CORREÇÃO MINIMAL)
 read -p "[4/13] Ativar Firewall (Recomendado)? (s/n): " confirm_ufw
 if [[ $confirm_ufw == [sS] ]]; then
+    echo "Instalando e configurando UFW..."
+    # AQUI ESTÁ A CORREÇÃO: Instala o ufw antes de usar
+    sudo apt install ufw -y
+    
     sudo ufw allow ssh
     sudo ufw allow http
     sudo ufw allow https
@@ -75,22 +79,18 @@ fi
 # 5. OTIMIZAÇÃO (KERNEL & HARDWARE)
 echo "[5/13] Otimizando Sistema..."
 
-# 5.1 MODO NOTEBOOK (NOVO!)
+# 5.1 MODO NOTEBOOK
 read -p "Este servidor é um NOTEBOOK (Laptop)? (s/n): " is_laptop
 if [[ $is_laptop == [sS] ]]; then
     echo "💻 Configurando para NÃO suspender ao fechar a tampa..."
-    # Edita o logind.conf para ignorar o fechamento da tampa
     sudo sed -i 's/^#HandleLidSwitch=suspend/HandleLidSwitch=ignore/' /etc/systemd/logind.conf
     sudo sed -i 's/^HandleLidSwitch=suspend/HandleLidSwitch=ignore/' /etc/systemd/logind.conf
-    # Reinicia o serviço de login para aplicar
     sudo systemctl restart systemd-logind
-    echo "✅ Modo 'Server Laptop' ativado! Pode fechar a tampa."
-else
-    echo "Ok, mantendo configuração padrão de energia."
+    echo "✅ Modo 'Server Laptop' ativado!"
 fi
 
 # 5.2 OTIMIZAÇÃO RAM
-echo "Aplicando otimização de Kernel (Swappiness)..."
+echo "Aplicando otimização de Kernel..."
 echo "vm.swappiness=10" | sudo tee -a /etc/sysctl.conf
 echo "* soft nofile 65535" | sudo tee -a /etc/security/limits.conf
 echo "* hard nofile 65535" | sudo tee -a /etc/security/limits.conf
@@ -109,9 +109,10 @@ sudo sysctl --system > /dev/null
 sudo apt install btop -y
 
 # 8. FERRAMENTAS EXTRAS
-echo "[8/13] Kit DevOps (Git, Ncdu, Fastfetch)..."
-read -p "Instalar ferramentas? (s/n): " confirm_tools
+echo "[8/13] Kit DevOps..."
+read -p "Instalar Git, Ncdu, Fastfetch e Rede? (s/n): " confirm_tools
 if [[ $confirm_tools == [sS] ]]; then
+    # Instala o pacote completo
     sudo apt install git curl wget net-tools iputils-ping dnsutils ncdu fastfetch -y
     if ! grep -q "fastfetch" ~/.bashrc; then
         echo -e "\n# Visual\nfastfetch" >> ~/.bashrc
