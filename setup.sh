@@ -2,7 +2,7 @@
 
 # Script de Setup DevOps - Foco: Aplot Cloud
 # Sistema: Ubuntu Server 24.04 LTS
-# Versão: 17.0 (Fastfetch PPA Fix & Error Handling)
+# Versão: 18.0 (Fail-Safe: Ignora erros visuais para garantir o setup)
 
 set -e
 
@@ -42,8 +42,11 @@ sudo timedatectl set-ntp true
 echo "[2/13] Preparando ambiente Minimal..."
 sudo apt update -y
 sudo apt install software-properties-common -y
-sudo add-apt-repository universe -y
-sudo add-apt-repository multiverse -y
+# Tenta adicionar repositórios extras (Universe/Multiverse)
+sudo add-apt-repository universe -y || true
+sudo add-apt-repository multiverse -y || true
+sudo apt update -y
+# Instala ferramentas base
 sudo apt install curl wget unzip git tar -y
 echo "✅ Ambiente base preparado."
 
@@ -71,7 +74,7 @@ fi
 read -p "[4/13] Ativar Firewall (Recomendado)? (s/n): " confirm_ufw
 if [[ $confirm_ufw == [sS] ]]; then
     if ! command -v ufw &> /dev/null; then
-        echo "Installing UFW..."
+        echo "Instalando UFW..."
         sudo apt install ufw -y
     fi
     sudo ufw allow ssh
@@ -114,26 +117,24 @@ sudo sysctl --system > /dev/null
 echo "[7/13] Instalando Monitoramento..."
 sudo apt install btop -y
 
-# 8. FERRAMENTAS EXTRAS (CORREÇÃO PPA)
+# 8. FERRAMENTAS EXTRAS (FAIL-SAFE)
 echo "[8/13] Kit DevOps..."
 read -p "Instalar Kit Completo (Ncdu, Fastfetch, Rede)? (s/n): " confirm_tools
 if [[ $confirm_tools == [sS] ]]; then
-    # 1. Instala ferramentas padrão primeiro (sem fastfetch)
+    # Instala o essencial primeiro
     sudo apt install net-tools iputils-ping dnsutils ncdu -y
     
-    # 2. Tenta instalar Fastfetch via PPA Oficial
-    echo "Tentando instalar Fastfetch via PPA..."
-    sudo add-apt-repository ppa:zhangsongcui3336/fastfetch -y
-    sudo apt update
-    
+    echo "Tentando instalar Fastfetch (Visual)..."
+    # O '|| true' faz o script CONTINUAR mesmo se o fastfetch falhar
     if sudo apt install fastfetch -y; then
-        echo "✅ Fastfetch instalado com sucesso via PPA."
+        echo "✅ Fastfetch instalado."
         if ! grep -q "fastfetch" ~/.bashrc; then
             echo -e "\n# Visual\nfastfetch" >> ~/.bashrc
         fi
     else
-        echo "⚠️  Não foi possível instalar Fastfetch. Pulando..."
-        echo "   (O restante das ferramentas foi instalado corretamente)."
+        echo "⚠️  AVISO: Fastfetch não encontrado no repositório Minimal."
+        echo "   -> Pulando instalação visual para não interromper o setup."
+        echo "   -> O servidor continuará funcionando perfeitamente sem ele."
     fi
 fi
 
